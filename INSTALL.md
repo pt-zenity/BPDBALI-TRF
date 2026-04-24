@@ -2,7 +2,7 @@
 
 > Sistem transaksi perbankan LPD (Lembaga Perkreditan Desa) Canggu berbasis PHP murni  
 > Support database: **SQLite** (default/lokal) dan **SQL Server / MSSQL** (produksi)  
-> Kompatibel: **PHP 7.0 — PHP 8.4** (tanpa framework, tanpa Composer)
+> Kompatibel: **PHP 7.0 — PHP 8.4** · **Apache 2.2 & 2.4** · Tanpa framework · Tanpa Composer
 
 ---
 
@@ -20,13 +20,14 @@
    - [Mode A: SQLite (Lokal/Dev)](#mode-a-sqlite-lokaldev)
    - [Mode B: SQL Server (Produksi)](#mode-b-sql-server-produksi)
 5. [Menjalankan Aplikasi](#5-menjalankan-aplikasi)
-   - [Cara 1: PHP Built-in Server (Sederhana)](#cara-1-php-built-in-server-sederhana)
-   - [Cara 2: Dengan PM2 (Daemon)](#cara-2-dengan-pm2-daemon)
-   - [Cara 3: Nginx + PHP-FPM (Produksi)](#cara-3-nginx--php-fpm-produksi)
-   - [Cara 4: Apache + mod_php](#cara-4-apache--mod_php)
+   - [⭐ Cara 1: Apache + mod\_php (Direkomendasikan)](#cara-1-apache--mod_php-direkomendasikan)
+   - [Cara 2: Apache + PHP-FPM (Produksi Tinggi)](#cara-2-apache--php-fpm-produksi-tinggi)
+   - [Cara 3: XAMPP / Laragon (Windows)](#cara-3-xampp--laragon-windows)
+   - [Cara 4: PHP Built-in Server (Dev Cepat)](#cara-4-php-built-in-server-dev-cepat)
+   - [Cara 5: Nginx + PHP-FPM (Alternatif)](#cara-5-nginx--php-fpm-alternatif)
 6. [Inisialisasi Database](#6-inisialisasi-database)
 7. [Verifikasi Instalasi](#7-verifikasi-instalasi)
-8. [Struktur Direktori](#8-struktur-direktori)
+8. [Struktur Direktori & File Konfigurasi](#8-struktur-direktori--file-konfigurasi)
 9. [Daftar API Endpoint](#9-daftar-api-endpoint)
 10. [Troubleshooting](#10-troubleshooting)
 11. [Keamanan Produksi](#11-keamanan-produksi)
@@ -39,24 +40,26 @@
 
 | Versi PHP | Status | Keterangan |
 |-----------|--------|------------|
-| PHP 7.0 | ✅ Didukung | Minimum, semua fitur berjalan |
-| PHP 7.1 | ✅ Didukung | |
-| PHP 7.2 | ✅ Didukung | |
-| PHP 7.3 | ✅ Didukung | |
+| PHP 7.0 | ✅ Didukung | Minimum |
+| PHP 7.1 – 7.3 | ✅ Didukung | |
 | PHP 7.4 | ✅ Didukung | |
-| PHP 8.0 | ✅ Didukung | |
-| PHP 8.1 | ✅ Didukung | |
-| PHP 8.2 | ✅ Didukung | |
-| PHP 8.3 | ✅ Didukung | |
+| PHP 8.0 – 8.3 | ✅ Didukung | |
 | PHP 8.4 | ✅ Didukung | Direkomendasikan |
 
-> **Catatan:** Tidak menggunakan fitur PHP 7.4+ seperti typed properties, `??=`, match expression, atau named arguments. Kode berjalan di semua versi PHP 7.0–8.4.
+### Web Server yang Didukung
+
+| Web Server | Status | Keterangan |
+|------------|--------|------------|
+| **Apache 2.2** | ✅ Didukung | Butuh `mod_rewrite` |
+| **Apache 2.4** | ✅ Didukung | **Direkomendasikan** |
+| PHP Built-in Server | ✅ Didukung | Untuk development saja |
+| Nginx | ✅ Didukung | Lihat Cara 5 |
 
 ### Kebutuhan Hardware Minimum
 
 | Komponen | Minimum | Rekomendasi |
 |----------|---------|-------------|
-| OS | Ubuntu 18.04 / Debian 9 / CentOS 7 / Windows Server 2016 | Ubuntu 22.04 LTS |
+| OS | Ubuntu 18.04 / Debian 9 / CentOS 7 / Windows 7+ | Ubuntu 22.04 LTS |
 | RAM | 256 MB | 512 MB+ |
 | Disk | 200 MB | 1 GB+ |
 | CPU | 1 Core | 2 Core+ |
@@ -69,12 +72,11 @@
 | `pdo_sqlite` | Driver SQLite | ✅ Wajib (mode SQLite) |
 | `sqlite3` | SQLite native | ✅ Wajib (mode SQLite) |
 | `json` | Parsing JSON request/response | ✅ Wajib |
-| `mbstring` | Multi-byte string (format Rupiah) | ✅ Wajib |
+| `mbstring` | Format Rupiah (number_format) | ✅ Wajib |
 | `openssl` | Enkripsi password | ✅ Wajib |
+| `mod_rewrite` | URL routing Apache | ✅ Wajib (Apache) |
 | `pdo_sqlsrv` | Driver SQL Server via PDO | ⚠️ Produksi saja |
 | `sqlsrv` | Driver SQL Server native | ⚠️ Produksi saja |
-
-> **Catatan:** `curl` tidak digunakan di server-side. Tidak membutuhkan Composer atau Node.js untuk menjalankan aplikasi.
 
 ---
 
@@ -87,22 +89,22 @@ git clone https://github.com/pt-zenity/BPDBALI-TRF.git lpd-canggu
 # Masuk ke direktori project
 cd lpd-canggu
 
-# Buat folder yang diperlukan
+# Buat folder yang diperlukan (jika belum ada)
 mkdir -p data logs
 
 # Set permission (Linux/Mac)
 chmod 755 data logs
 ```
 
-> **Tidak perlu `npm install` atau `composer install`** — aplikasi berjalan langsung dengan PHP tanpa dependensi eksternal.
+> **Tidak perlu `npm install` atau `composer install`** — berjalan langsung dengan PHP + Apache.
+
+> **`.htaccess` sudah tersedia** di repository — tidak perlu dibuat manual.
 
 ---
 
 ## 3. Instalasi PHP & Ekstensi
 
 ### Ubuntu/Debian — PHP 7.x
-
-> Gunakan PPA `ondrej/php` untuk instalasi PHP 7.x di Ubuntu modern.
 
 ```bash
 # 1. Tambah PPA ondrej/php (mendukung semua versi PHP)
@@ -111,28 +113,19 @@ sudo apt-get install -y software-properties-common
 sudo add-apt-repository ppa:ondrej/php -y
 sudo apt-get update
 
-# 2. Install PHP 7.4 (atau ganti 7.4 dengan 7.0 / 7.1 / 7.2 / 7.3)
+# 2. Install PHP 7.4 beserta ekstensi (ganti 7.4 → 7.0 / 7.1 / 7.2 / 7.3 sesuai kebutuhan)
 sudo apt-get install -y \
+    php7.4 \
     php7.4-cli \
     php7.4-sqlite3 \
     php7.4-mbstring \
     php7.4-xml \
     php7.4-json \
-    php7.4-openssl
+    libapache2-mod-php7.4
 
 # 3. Verifikasi
 php --version
-php -m | grep -E "sqlite|pdo|json|mbstring|openssl"
-```
-
-Contoh output:
-```
-PHP 7.4.33 (cli)
-json
-mbstring
-openssl
-pdo_sqlite
-sqlite3
+php -m | grep -E "sqlite|pdo|json|mbstring"
 ```
 
 ---
@@ -146,13 +139,14 @@ sudo apt-get install -y software-properties-common
 sudo add-apt-repository ppa:ondrej/php -y
 sudo apt-get update
 
-# 2. Install PHP 8.4 (atau ganti 8.4 dengan 8.0 / 8.1 / 8.2 / 8.3)
+# 2. Install PHP 8.4 beserta ekstensi (ganti 8.4 → 8.0 / 8.1 / 8.2 / 8.3 sesuai kebutuhan)
 sudo apt-get install -y \
+    php8.4 \
     php8.4-cli \
     php8.4-sqlite3 \
     php8.4-mbstring \
     php8.4-xml \
-    php8.4-openssl
+    libapache2-mod-php8.4
 
 # 3. Verifikasi
 php --version
@@ -167,10 +161,10 @@ php -m | grep -E "sqlite|pdo|json|mbstring"
 # 1. Tambah Remi repository
 sudo dnf install -y https://rpms.remirepo.net/enterprise/remi-release-9.rpm
 sudo dnf module reset php
-sudo dnf module enable php:remi-8.4   # Atau remi-7.4, remi-8.0, dst
+sudo dnf module enable php:remi-8.4   # Atau remi-7.4, remi-8.0, dst.
 
-# 2. Install PHP dan ekstensi
-sudo dnf install -y php php-cli php-pdo php-sqlite3 php-mbstring php-json php-xml
+# 2. Install PHP + Apache + ekstensi
+sudo dnf install -y httpd php php-cli php-pdo php-sqlite3 php-mbstring php-json php-xml
 
 # 3. Verifikasi
 php --version
@@ -192,44 +186,26 @@ php -m | grep -E "sqlite|pdo|json|mbstring"
    extension=mbstring
    extension=openssl
    ```
-4. Restart Apache dari XAMPP Control Panel
+4. Pastikan `mod_rewrite` aktif di `C:\xampp\apache\conf\httpd.conf`:
+   ```apache
+   LoadModule rewrite_module modules/mod_rewrite.so
+   ```
+5. Restart Apache dari XAMPP Control Panel
 
 **Menggunakan Laragon:**
 
-1. Download Laragon dari https://laragon.org/download/
-2. Pilih versi Full (sudah include PHP, MySQL, Apache, Nginx)
-3. Klik kanan ikon Laragon → PHP → Pilih versi (7.x atau 8.x)
-4. Ekstensi SQLite sudah aktif secara default
-
-**Menggunakan PHP standalone (tanpa web server):**
-
-```powershell
-# Download PHP dari https://windows.php.net/download/
-# Ekstrak ke C:\php
-
-# Salin php.ini-development ke php.ini
-copy C:\php\php.ini-development C:\php\php.ini
-
-# Edit php.ini — hapus ; di depan baris berikut:
-; extension=pdo_sqlite
-; extension=sqlite3
-; extension=mbstring
-; extension=openssl
-
-# Tambahkan C:\php ke PATH system environment
-
-# Verifikasi
-php --version
-php -m | grep -E "sqlite|pdo|mbstring"
-```
+1. Download dari https://laragon.org/download/ (pilih versi Full)
+2. Install dan jalankan Laragon
+3. Klik kanan ikon Laragon di system tray → PHP → Pilih versi (7.x atau 8.x)
+4. `mod_rewrite` dan SQLite sudah aktif secara default
 
 ---
 
 ### Tambahan: SQL Server (Produksi)
 
-Instalasi driver `sqlsrv` dan `pdo_sqlsrv` diperlukan **hanya** jika menggunakan SQL Server sebagai database produksi.
+Driver `sqlsrv` diperlukan **hanya** jika menggunakan SQL Server sebagai database produksi.
 
-#### Linux (Ubuntu/Debian)
+#### Linux
 
 ```bash
 # 1. Tambah Microsoft repository
@@ -241,54 +217,45 @@ sudo apt-get update
 # 2. Install ODBC Driver 18
 sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18 unixodbc-dev
 
-# 3. Install PECL dan dependensi build PHP
-sudo apt-get install -y php8.4-dev  # Atau php7.4-dev sesuai versi
+# 3. Install PECL + dependensi build
+sudo apt-get install -y php8.4-dev   # Sesuaikan versi PHP
 
 # 4. Install ekstensi via PECL
 sudo pecl install sqlsrv pdo_sqlsrv
 
 # 5. Aktifkan ekstensi
 PHP_VER=$(php -r "echo PHP_MAJOR_VERSION.'.'.PHP_MINOR_VERSION;")
-echo "extension=sqlsrv.so"     | sudo tee /etc/php/${PHP_VER}/cli/conf.d/30-sqlsrv.ini
-echo "extension=pdo_sqlsrv.so" | sudo tee /etc/php/${PHP_VER}/cli/conf.d/30-pdo_sqlsrv.ini
+echo "extension=sqlsrv.so"     | sudo tee /etc/php/${PHP_VER}/apache2/conf.d/30-sqlsrv.ini
+echo "extension=pdo_sqlsrv.so" | sudo tee /etc/php/${PHP_VER}/apache2/conf.d/30-pdo_sqlsrv.ini
 
-# 6. Verifikasi
-php -m | grep sqlsrv
+# 6. Restart Apache
+sudo systemctl restart apache2
 ```
 
 #### Windows
 
 1. Download driver dari: https://learn.microsoft.com/en-us/sql/connect/php/download-drivers-php-sql-server
-2. Copy file `.dll` yang sesuai versi PHP ke folder `ext/`:
-   - PHP 7.4: `php_sqlsrv_74_ts.dll` dan `php_pdo_sqlsrv_74_ts.dll`
-   - PHP 8.4: `php_sqlsrv_84_ts.dll` dan `php_pdo_sqlsrv_84_ts.dll`
+2. Copy `.dll` yang sesuai versi PHP ke folder `ext/`:
+   - PHP 7.4: `php_sqlsrv_74_ts.dll` + `php_pdo_sqlsrv_74_ts.dll`
+   - PHP 8.4: `php_sqlsrv_84_ts.dll` + `php_pdo_sqlsrv_84_ts.dll`
 3. Tambahkan di `php.ini`:
    ```ini
    extension=sqlsrv
    extension=pdo_sqlsrv
    ```
+4. Restart Apache
 
 ---
 
 ## 4. Konfigurasi Database
 
-Salin file contoh konfigurasi:
+Salin file contoh konfigurasi lalu sesuaikan:
 
 ```bash
 cp .env.example .env
+nano .env        # Linux
+# notepad .env  # Windows
 ```
-
-Lalu edit sesuai kebutuhan:
-
-```bash
-# Linux
-nano .env
-
-# Windows
-notepad .env
-```
-
----
 
 ### Mode A: SQLite (Lokal/Dev)
 
@@ -296,292 +263,327 @@ notepad .env
 # .env — Mode SQLite (Default)
 DB_CONNECTION=sqlite
 
-# Path absolut ke file database (direkomendasikan)
-SQLITE_PATH=/home/user/lpd-canggu/data/lpd_canggu.sqlite
+# Path ABSOLUT ke file database
+SQLITE_PATH=/var/www/html/lpd-canggu/data/lpd_canggu.sqlite
 
-# Windows:
+# Windows XAMPP:
 # SQLITE_PATH=C:/xampp/htdocs/lpd-canggu/data/lpd_canggu.sqlite
 ```
 
-> **SQLite adalah default** — jika file `.env` tidak ada, aplikasi otomatis menggunakan SQLite dengan path `data/lpd_canggu.sqlite` di dalam folder project.
-
----
+> Jika `.env` tidak ada, aplikasi otomatis menggunakan SQLite dengan path `data/lpd_canggu.sqlite` di dalam folder project.
 
 ### Mode B: SQL Server (Produksi)
 
 ```ini
 # .env — Mode SQL Server
 DB_CONNECTION=sqlsrv
-DB_HOST=192.168.1.100         # IP atau hostname SQL Server
-DB_PORT=1433                   # Port default SQL Server
-DB_DATABASE=Giosoft_LPD       # Nama database
-DB_USERNAME=sa                 # Username SQL Server
-DB_PASSWORD=#sa.lpd.Canggu.21 # Password SQL Server
+DB_HOST=192.168.1.100
+DB_PORT=1433
+DB_DATABASE=Giosoft_LPD
+DB_USERNAME=sa
+DB_PASSWORD=#sa.lpd.Canggu.21
 ```
-
-> **Penting:** Pastikan SQL Server mengizinkan koneksi TCP/IP di port 1433 dan firewall sudah membuka akses dari server PHP.
 
 ---
 
 ## 5. Menjalankan Aplikasi
 
-### Cara 1: PHP Built-in Server (Sederhana)
+### Cara 1: Apache + mod_php (Direkomendasikan)
 
-Cocok untuk **development** atau **testing** cepat. Tidak perlu instalasi web server.
+Cara paling umum dan mudah. `mod_php` berjalan langsung dalam proses Apache — tidak perlu konfigurasi PHP-FPM terpisah.
+
+#### Install Apache + mod_php
 
 ```bash
-# Masuk ke folder project
+# Ubuntu/Debian
+sudo apt-get update
+sudo apt-get install -y apache2 libapache2-mod-php8.4 php8.4-sqlite3 php8.4-mbstring
+
+# Aktifkan modul yang diperlukan
+sudo a2enmod rewrite headers expires deflate
+sudo systemctl restart apache2
+```
+
+#### Tempatkan File Project
+
+```bash
+# Salin project ke DocumentRoot Apache
+sudo cp -r lpd-canggu /var/www/html/lpd-canggu
+
+# Set permission folder data dan logs
+sudo chown -R www-data:www-data /var/www/html/lpd-canggu/data
+sudo chown -R www-data:www-data /var/www/html/lpd-canggu/logs
+sudo chmod 755 /var/www/html/lpd-canggu/data
+sudo chmod 755 /var/www/html/lpd-canggu/logs
+```
+
+#### Buat Virtual Host Apache
+
+```bash
+sudo nano /etc/apache2/sites-available/lpd-canggu.conf
+```
+
+Isi konfigurasi Virtual Host:
+
+```apache
+<VirtualHost *:80>
+    ServerName lpd.contoh.id
+    # ServerAlias www.lpd.contoh.id   # Aktifkan jika pakai www
+
+    DocumentRoot /var/www/html/lpd-canggu
+    DirectoryIndex index.php
+
+    <Directory /var/www/html/lpd-canggu>
+        # Izinkan .htaccess berfungsi
+        AllowOverride All
+        Options -Indexes -MultiViews +FollowSymLinks
+
+        # Apache 2.4
+        Require all granted
+
+        # Apache 2.2 (gunakan ini jika pakai Apache lama)
+        # Order allow,deny
+        # Allow from all
+    </Directory>
+
+    # Log
+    ErrorLog  ${APACHE_LOG_DIR}/lpd-canggu-error.log
+    CustomLog ${APACHE_LOG_DIR}/lpd-canggu-access.log combined
+</VirtualHost>
+```
+
+```bash
+# Aktifkan site dan reload Apache
+sudo a2ensite lpd-canggu.conf
+sudo a2dissite 000-default.conf   # Nonaktifkan default site (opsional)
+sudo apache2ctl configtest        # Test konfigurasi
+sudo systemctl reload apache2
+
+# Akses di browser:
+# http://lpd.contoh.id
+# atau http://IP_SERVER/lpd-canggu/ (jika tanpa Virtual Host)
+```
+
+#### Akses di Sub-folder (Tanpa Virtual Host)
+
+Jika ingin akses via `http://localhost/lpd-canggu/` tanpa Virtual Host:
+
+```bash
+# Tempatkan di htdocs/DocumentRoot
+sudo cp -r lpd-canggu /var/www/html/lpd-canggu
+
+# Buka browser
+# http://localhost/lpd-canggu/
+```
+
+> **Penting:** Edit `.htaccess` root — ubah `RewriteBase` sesuai sub-folder:
+> ```apache
+> # Dari:
+> RewriteBase /
+> # Menjadi (sesuai nama folder):
+> RewriteBase /lpd-canggu/
+> ```
+
+---
+
+### Cara 2: Apache + PHP-FPM (Produksi Tinggi)
+
+Lebih performa untuk server dengan traffic tinggi. PHP-FPM berjalan sebagai proses terpisah.
+
+#### Install
+
+```bash
+# Install Apache + PHP-FPM (sesuaikan versi PHP)
+sudo apt-get install -y apache2 php8.4-fpm php8.4-sqlite3 php8.4-mbstring
+
+# Aktifkan modul yang diperlukan
+sudo a2enmod rewrite proxy_fcgi setenvif headers expires
+sudo a2enconf php8.4-fpm
+sudo systemctl restart apache2 php8.4-fpm
+```
+
+#### Virtual Host untuk PHP-FPM
+
+```bash
+sudo nano /etc/apache2/sites-available/lpd-canggu.conf
+```
+
+```apache
+<VirtualHost *:80>
+    ServerName lpd.contoh.id
+    DocumentRoot /var/www/html/lpd-canggu
+    DirectoryIndex index.php
+
+    <Directory /var/www/html/lpd-canggu>
+        AllowOverride All
+        Options -Indexes -MultiViews +FollowSymLinks
+        Require all granted
+    </Directory>
+
+    # Arahkan PHP ke PHP-FPM socket
+    <FilesMatch "\.php$">
+        SetHandler "proxy:unix:/run/php/php8.4-fpm.sock|fcgi://localhost"
+    </FilesMatch>
+
+    ErrorLog  ${APACHE_LOG_DIR}/lpd-canggu-error.log
+    CustomLog ${APACHE_LOG_DIR}/lpd-canggu-access.log combined
+</VirtualHost>
+```
+
+```bash
+sudo a2ensite lpd-canggu.conf
+sudo apache2ctl configtest
+sudo systemctl reload apache2
+```
+
+---
+
+### Cara 3: XAMPP / Laragon (Windows)
+
+Cara tercepat untuk instalasi di Windows — cocok untuk development maupun server Windows.
+
+#### XAMPP (Windows)
+
+1. Download & install XAMPP dari https://www.apachefriends.org/
+2. Jalankan XAMPP Control Panel, klik **Start** pada Apache
+3. Salin folder project ke `C:\xampp\htdocs\lpd-canggu\`
+4. Pastikan `mod_rewrite` aktif — cek `C:\xampp\apache\conf\httpd.conf`:
+   ```apache
+   LoadModule rewrite_module modules/mod_rewrite.so
+   ```
+   Jika ada tanda `#` di depan, hapus, lalu restart Apache
+5. Pastikan `AllowOverride All` aktif:
+   ```apache
+   <Directory "C:/xampp/htdocs">
+       AllowOverride All
+       ...
+   </Directory>
+   ```
+6. Akses: **http://localhost/lpd-canggu/**
+
+> **Edit `.htaccess` root** — ubah `RewriteBase` menjadi `/lpd-canggu/`:
+> ```apache
+> RewriteBase /lpd-canggu/
+> ```
+
+#### Laragon (Windows)
+
+1. Download & install Laragon dari https://laragon.org/download/
+2. Jalankan Laragon, klik **Start All**
+3. Salin folder project ke `C:\laragon\www\lpd-canggu\`
+4. Laragon otomatis membuat Virtual Host — akses: **http://lpd-canggu.test/**
+5. `mod_rewrite` sudah aktif secara default, `RewriteBase /` sudah sesuai
+
+---
+
+### Cara 4: PHP Built-in Server (Dev Cepat)
+
+Untuk testing cepat tanpa perlu install Apache. **Jangan digunakan di production.**
+
+```bash
 cd /path/ke/lpd-canggu
 
 # Jalankan di port 8080
 php -S 0.0.0.0:8080 router.php
 
-# Akses di browser:
-# http://localhost:8080
+# Akses: http://localhost:8080
 ```
 
-Hentikan dengan `Ctrl + C`.
+> File `router.php` sudah dikonfigurasi khusus untuk PHP built-in server.  
+> Mode ini **tidak menggunakan** `.htaccess`.
 
-**Windows:**
-```powershell
-cd C:\xampp\htdocs\lpd-canggu
-php -S 0.0.0.0:8080 router.php
-```
-
----
-
-### Cara 2: Dengan PM2 (Daemon)
-
-Cocok untuk **server Linux** agar proses tetap berjalan di background setelah logout.
+**Dengan PM2 (daemon background):**
 
 ```bash
-# 1. Install Node.js & PM2 (jika belum ada)
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -
-sudo apt-get install -y nodejs
+# Install PM2
 sudo npm install -g pm2
 
-# 2. Cek path PHP
-which php        # Contoh: /usr/bin/php
-
-# 3. Edit ecosystem.config.cjs — sesuaikan PATH
-nano ecosystem.config.cjs
-```
-
-Edit `ecosystem.config.cjs` dengan path yang sesuai:
-
-```javascript
-module.exports = {
-  apps: [
-    {
-      name: 'lpd-php',
-      script: '/usr/bin/php',                   // <- hasil `which php`
-      args: '-S 0.0.0.0:8080 /FULL/PATH/lpd-canggu/router.php',
-      cwd: '/FULL/PATH/lpd-canggu',              // <- path absolut folder project
-      interpreter: 'none',
-      watch: false,
-      instances: 1,
-      exec_mode: 'fork',
-      env: {
-        DB_CONNECTION: 'sqlite',
-        SQLITE_PATH: '/FULL/PATH/lpd-canggu/data/lpd_canggu.sqlite',
-      },
-      error_file: '/FULL/PATH/lpd-canggu/logs/pm2-error.log',
-      out_file:   '/FULL/PATH/lpd-canggu/logs/pm2-out.log',
-    }
-  ]
-};
-```
-
-```bash
-# 4. Jalankan dengan PM2
+# Jalankan
 pm2 start ecosystem.config.cjs
 
-# 5. Cek status
-pm2 list
-pm2 logs lpd-php --nostream
-
-# 6. Auto-start saat server reboot
-pm2 startup
-pm2 save
-```
-
-**Perintah PM2 berguna:**
-
-```bash
-pm2 restart lpd-php   # Restart aplikasi
-pm2 stop lpd-php      # Hentikan sementara
-pm2 delete lpd-php    # Hapus dari PM2
-pm2 monit             # Monitor real-time (CPU & RAM)
-pm2 logs lpd-php      # Lihat log (tekan Ctrl+C untuk keluar)
+# Auto-start saat reboot
+pm2 startup && pm2 save
 ```
 
 ---
 
-### Cara 3: Nginx + PHP-FPM (Produksi)
+### Cara 5: Nginx + PHP-FPM (Alternatif)
 
-Cocok untuk **production server** dengan performa tinggi dan kemampuan HTTPS.
-
-#### Install PHP-FPM
+Jika ingin menggunakan Nginx sebagai alternatif Apache.
 
 ```bash
-# Sesuaikan versi PHP (7.4, 8.1, 8.4, dst.)
-sudo apt-get install -y php8.4-fpm
-
-# Verifikasi
-systemctl status php8.4-fpm
+sudo apt-get install -y nginx php8.4-fpm php8.4-sqlite3 php8.4-mbstring
 ```
-
-#### Konfigurasi Nginx
 
 ```bash
 sudo nano /etc/nginx/sites-available/lpd-canggu
 ```
 
-Isi dengan konfigurasi berikut:
-
 ```nginx
 server {
     listen 80;
-    server_name lpd.contoh.id;           # Ganti dengan domain atau IP Anda
-    root /var/www/lpd-canggu;            # Path ke folder project
-
+    server_name lpd.contoh.id;
+    root /var/www/html/lpd-canggu;
     index index.php;
-    charset utf-8;
 
-    # Semua request diarahkan ke router.php kecuali file statis
+    # Arahkan semua request ke router.php
     location / {
         try_files $uri $uri/ /router.php$is_args$query_string;
     }
 
-    # Static files (CSS, JS, gambar, font)
-    location ~* \.(css|js|png|jpg|jpeg|ico|svg|woff2?|ttf|eot)$ {
+    # Static files
+    location ~* \.(css|js|png|jpg|ico|svg|woff2?)$ {
         expires 7d;
         access_log off;
-        add_header Cache-Control "public";
     }
 
-    # PHP-FPM handler
+    # PHP-FPM
     location ~ \.php$ {
-        fastcgi_pass   unix:/run/php/php8.4-fpm.sock;  # Sesuaikan versi PHP
+        fastcgi_pass   unix:/run/php/php8.4-fpm.sock;
         fastcgi_index  index.php;
         fastcgi_param  SCRIPT_FILENAME $document_root$fastcgi_script_name;
         include        fastcgi_params;
-        fastcgi_read_timeout 60;
     }
 
-    # Sembunyikan file sensitif
-    location ~ /\.(env|git|htaccess) {
-        deny all;
-        return 404;
-    }
+    # Larang akses file & folder sensitif
+    location ~ ^/(data|logs|config|includes|api)/ { deny all; }
+    location ~ /\.(env|git|htaccess|user\.ini)    { deny all; }
 
-    # Larang akses langsung ke folder data dan logs
-    location ~ ^/(data|logs)/ {
-        deny all;
-        return 404;
-    }
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
-    add_header X-XSS-Protection "1; mode=block";
-
-    # Log
-    access_log /var/log/nginx/lpd-canggu-access.log;
     error_log  /var/log/nginx/lpd-canggu-error.log;
+    access_log /var/log/nginx/lpd-canggu-access.log;
 }
 ```
 
 ```bash
-# Aktifkan site dan reload Nginx
 sudo ln -s /etc/nginx/sites-available/lpd-canggu /etc/nginx/sites-enabled/
-sudo nginx -t                        # Test konfigurasi
+sudo nginx -t
 sudo systemctl reload nginx
-
-# Izin folder data dan logs untuk www-data
-sudo chown -R www-data:www-data /var/www/lpd-canggu/data
-sudo chown -R www-data:www-data /var/www/lpd-canggu/logs
-sudo chmod 755 /var/www/lpd-canggu/data /var/www/lpd-canggu/logs
 ```
 
-#### Pasang SSL dengan Let's Encrypt (HTTPS gratis)
-
-```bash
-sudo apt-get install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d lpd.contoh.id
-```
-
----
-
-### Cara 4: Apache + mod_php
-
-Cocok jika sudah menggunakan Apache (XAMPP, LAMP stack).
-
-#### Linux (Apache + mod_php)
-
-```bash
-# Install Apache dan PHP
-sudo apt-get install -y apache2 php8.4 libapache2-mod-php8.4 php8.4-sqlite3 php8.4-mbstring
-
-# Aktifkan mod_rewrite
-sudo a2enmod rewrite
-sudo systemctl restart apache2
-```
-
-Buat file `.htaccess` di root project (jika belum ada):
-
-```apache
-# /var/www/html/lpd-canggu/.htaccess
-Options -MultiViews
-RewriteEngine On
-
-# Arahkan semua request ke router.php
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-RewriteRule ^ router.php [L,QSA]
-
-# Larang akses ke folder sensitif
-RewriteRule ^(data|logs)/ - [F,L]
-RewriteRule \.env$ - [F,L]
-```
-
-Pastikan `AllowOverride All` aktif di konfigurasi Apache:
-
-```apache
-<Directory /var/www/html/lpd-canggu>
-    AllowOverride All
-</Directory>
-```
-
-```bash
-sudo systemctl restart apache2
-```
-
-#### Windows (XAMPP)
-
-1. Ekstrak project ke `C:\xampp\htdocs\lpd-canggu\`
-2. Buat `.htaccess` dengan isi sama seperti di atas
-3. Pastikan `mod_rewrite` aktif di `C:\xampp\apache\conf\httpd.conf`:
-   ```apache
-   LoadModule rewrite_module modules/mod_rewrite.so
-   ```
-4. Akses via: `http://localhost/lpd-canggu/`
+> Untuk Nginx, file `.htaccess` **tidak digunakan** — routing ditangani oleh konfigurasi Nginx di atas.
 
 ---
 
 ## 6. Inisialisasi Database
 
-Setelah server berjalan, **wajib** menginisialisasi database terlebih dahulu (hanya sekali).
+Setelah server berjalan, inisialisasi database terlebih dahulu (hanya sekali).
 
 ### Via Browser
 
-1. Buka aplikasi di browser (contoh: `http://localhost:8080`)
+1. Buka aplikasi di browser (contoh: `http://lpd.contoh.id` atau `http://localhost/lpd-canggu/`)
 2. Klik tombol **"⚙ Init DB"** di pojok kanan atas topbar
 3. Tunggu hingga muncul notifikasi sukses
 
-### Via curl (Terminal)
+### Via curl
 
 ```bash
+# Apache / Nginx
+curl -X POST http://lpd.contoh.id/api/init-db
+
+# XAMPP sub-folder
+curl -X POST http://localhost/lpd-canggu/api/init-db
+
+# PHP built-in server
 curl -X POST http://localhost:8080/api/init-db
 ```
 
@@ -592,23 +594,15 @@ Respons sukses:
   "status": "00",
   "message": "Database berhasil diinisialisasi",
   "driver": "sqlite",
-  "path": "/path/ke/data/lpd_canggu.sqlite",
+  "path": "/var/www/html/lpd-canggu/data/lpd_canggu.sqlite",
   "detail": [
-    "gmob_nasabah OK",
-    "gmob_rekening OK",
-    "gtb_nasabah OK",
-    "gtb_folio OK",
-    "gmob_transfer OK",
-    "gcore_bankcode OK",
-    "gmob_token OK",
-    "gmob_log_trans OK",
-    "Bank codes seeded OK",
-    "Admin seeded OK"
+    "gmob_nasabah OK", "gmob_rekening OK", "gtb_nasabah OK",
+    "gtb_folio OK", "gmob_transfer OK", "gcore_bankcode OK",
+    "gmob_token OK", "gmob_log_trans OK",
+    "Bank codes seeded OK", "Admin seeded OK"
   ]
 }
 ```
-
-> ✅ **Aman dijalankan berulang kali** — menggunakan `INSERT OR IGNORE`, sehingga data yang sudah ada tidak akan terhapus atau di-reset.
 
 **Akun default setelah init:**
 
@@ -625,121 +619,72 @@ Respons sukses:
 
 ## 7. Verifikasi Instalasi
 
-Jalankan script berikut untuk memastikan semua endpoint berfungsi:
-
 ```bash
-BASE="http://localhost:8080"
+# Ganti BASE sesuai cara yang dipakai:
+BASE="http://lpd.contoh.id"          # Virtual Host
+# BASE="http://localhost/lpd-canggu" # XAMPP sub-folder
+# BASE="http://localhost:8080"        # PHP built-in
 
 echo "========================================"
 echo " LPD Canggu — Verifikasi Instalasi"
 echo "========================================"
 
-# 1. Cek halaman utama
-echo ""
-echo "1. Halaman Utama"
+# 1. Halaman utama
 HTTP=$(curl -s -o /dev/null -w "%{http_code}" $BASE/)
-echo "   HTTP Status: $HTTP $([ "$HTTP" = "200" ] && echo "✅" || echo "❌")"
+echo "1. Halaman Utama : HTTP $HTTP $([ "$HTTP" = "200" ] && echo "✅" || echo "❌")"
 
-# 2. Init Database
-echo ""
-echo "2. Inisialisasi Database"
-INIT=$(curl -s -X POST $BASE/api/init-db)
-STATUS=$(echo $INIT | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null)
-echo "   Status: $STATUS $([ "$STATUS" = "00" ] && echo "✅" || echo "❌")"
+# 2. Init DB
+STATUS=$(curl -s -X POST $BASE/api/init-db | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','ERR'))" 2>/dev/null)
+echo "2. Init Database : $STATUS $([ "$STATUS" = "00" ] && echo "✅" || echo "❌")"
 
 # 3. Login admin
-echo ""
-echo "3. Login Admin"
-LOGIN=$(curl -s -X POST $BASE/api/login \
+STATUS=$(curl -s -X POST $BASE/api/login \
   -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}')
-STATUS=$(echo $LOGIN | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','?'))" 2>/dev/null)
-echo "   Status: $STATUS $([ "$STATUS" = "00" ] && echo "✅" || echo "❌")"
+  -d '{"username":"admin","password":"admin123"}' \
+  | python3 -c "import sys,json; print(json.load(sys.stdin).get('status','ERR'))" 2>/dev/null)
+echo "3. Login Admin   : $STATUS $([ "$STATUS" = "00" ] && echo "✅" || echo "❌")"
 
 # 4. Daftar bank
-echo ""
-echo "4. Daftar Bank"
-BANKS=$(curl -s $BASE/api/bank-list)
-STATUS=$(echo $BANKS | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','?'), '-', len(d.get('data',[])), 'bank')" 2>/dev/null)
-echo "   Status: $STATUS"
+RESULT=$(curl -s $BASE/api/bank-list | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','ERR'), '-', len(d.get('data',[])), 'bank')" 2>/dev/null)
+echo "4. Daftar Bank   : $RESULT"
 
 # 5. Dashboard
-echo ""
-echo "5. Dashboard"
-DASH=$(curl -s $BASE/api/dashboard)
-STATUS=$(echo $DASH | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('stats',{}); print(d.get('status','?'), '- Nasabah:', s.get('total_nasabah',0))" 2>/dev/null)
-echo "   Status: $STATUS"
+RESULT=$(curl -s $BASE/api/dashboard | python3 -c "import sys,json; d=json.load(sys.stdin); s=d.get('stats',{}); print(d.get('status','ERR'), '- Nasabah:', s.get('total_nasabah',0))" 2>/dev/null)
+echo "5. Dashboard     : $RESULT"
 
-echo ""
 echo "========================================"
 echo " Selesai! Akses: $BASE"
 echo "========================================"
 ```
 
-### Skenario Test Lengkap (Opsional)
-
-```bash
-BASE="http://localhost:8080"
-
-# Buat nasabah baru
-echo "--- Buat Nasabah ---"
-curl -s -X POST $BASE/api/nasabah \
-  -H "Content-Type: application/json" \
-  -d '{"nama":"I Wayan Test","username":"wayan.test","pass_crypto":"test123456","phone":"081234567890"}' \
-  | python3 -m json.tool
-
-# Aktifkan nasabah (ganti 2 dengan ID dari response di atas)
-echo "--- Aktifkan Nasabah ---"
-curl -s -X PUT $BASE/api/nasabah/2/status \
-  -H "Content-Type: application/json" \
-  -d '{"status":"A"}' | python3 -m json.tool
-
-# Setor tunai
-echo "--- Setor Tunai ---"
-curl -s -X POST $BASE/api/setor \
-  -H "Content-Type: application/json" \
-  -d '{"norek":"01.000002","amount":1000000,"remark":"Setoran awal"}' \
-  | python3 -m json.tool
-
-# Cek saldo
-echo "--- Cek Saldo ---"
-curl -s $BASE/api/saldo/01.000002 | python3 -m json.tool
-
-# Tarik tunai
-echo "--- Tarik Tunai ---"
-curl -s -X POST $BASE/api/tarik \
-  -H "Content-Type: application/json" \
-  -d '{"norek":"01.000002","amount":200000,"remark":"Tarik kebutuhan"}' \
-  | python3 -m json.tool
-
-# Mutasi rekening
-echo "--- Mutasi Rekening ---"
-curl -s $BASE/api/mutasi/01.000002 | python3 -m json.tool
-```
-
 ---
 
-## 8. Struktur Direktori
+## 8. Struktur Direktori & File Konfigurasi
 
 ```
 lpd-canggu/
 │
-├── router.php                  ← Entry point & router utama
+├── .htaccess                   ← ⭐ Routing Apache (RewriteRule → router.php)
+├── .user.ini                   ← PHP settings untuk PHP-FPM
+├── router.php                  ← Router untuk PHP built-in server
 ├── index.php                   ← Halaman SPA (HTML + Tailwind CSS + Vanilla JS)
 ├── .env                        ← Konfigurasi environment (buat dari .env.example)
 ├── .env.example                ← Contoh konfigurasi
-├── .gitignore                  ← File yang diabaikan git
-├── ecosystem.config.cjs        ← Konfigurasi PM2
+├── .gitignore
+├── ecosystem.config.cjs        ← Konfigurasi PM2 (untuk PHP built-in server)
 ├── INSTALL.md                  ← Dokumentasi instalasi ini
 │
 ├── config/
-│   └── database.php            ← Kelas DB, konstanta, inisialisasi schema & seed data
+│   ├── .htaccess               ← Larang akses langsung dari browser
+│   └── database.php            ← Kelas DB, konstanta, schema & seed data
 │
 ├── includes/
+│   ├── .htaccess               ← Larang akses langsung dari browser
 │   ├── bootstrap.php           ← Auto-load semua dependencies & init koneksi DB
-│   └── helpers.php             ← Helper functions (json_ok, rp, trans_no, insert_folio, dll)
+│   └── helpers.php             ← Helper functions (json_ok, rp, trans_no, dll)
 │
-├── api/                        ← API Endpoints (satu file per endpoint)
+├── api/
+│   ├── .htaccess               ← Larang akses langsung dari browser
 │   ├── init.php                ← POST /api/init-db
 │   ├── login.php               ← POST /api/login
 │   ├── nasabah.php             ← CRUD /api/nasabah
@@ -755,15 +700,28 @@ lpd-canggu/
 │   └── bank_list.php           ← GET  /api/bank-list
 │
 ├── public/                     ← Static assets (CSS, JS, gambar)
+│   ├── css/
+│   └── js/
 │
-├── data/                       ← Database SQLite (auto-created, tidak di-commit ke git)
-│   └── lpd_canggu.sqlite
+├── data/
+│   ├── .htaccess               ← Larang akses file SQLite dari browser
+│   └── lpd_canggu.sqlite       ← Database (auto-created, tidak di-commit)
 │
-└── logs/                       ← Log aplikasi (auto-created, tidak di-commit ke git)
-    ├── php_error.log
-    ├── pm2-out.log
-    └── pm2-error.log
+└── logs/
+    ├── .htaccess               ← Larang akses log dari browser
+    └── php_error.log           ← Log PHP error (tidak di-commit)
 ```
+
+### Penjelasan File `.htaccess`
+
+| File | Fungsi |
+|------|--------|
+| `.htaccess` (root) | Routing semua request ke `router.php` via `mod_rewrite` |
+| `api/.htaccess` | Blokir akses langsung ke file PHP (harus lewat router) |
+| `config/.htaccess` | Blokir akses folder konfigurasi database |
+| `includes/.htaccess` | Blokir akses folder helper & bootstrap |
+| `data/.htaccess` | Blokir akses file SQLite dari browser |
+| `logs/.htaccess` | Blokir akses file log dari browser |
 
 ---
 
@@ -773,188 +731,77 @@ lpd-canggu/
 
 | Method | Endpoint | Keterangan |
 |--------|----------|------------|
-| `POST` | `/api/init-db` | Inisialisasi / reset schema database |
+| `POST` | `/api/init-db` | Inisialisasi schema database |
 | `POST` | `/api/login` | Login nasabah atau admin |
 | `GET` | `/api/nasabah` | List semua nasabah (`?q=cari&status=A`) |
-| `GET` | `/api/nasabah/{id}` | Detail satu nasabah beserta histori |
+| `GET` | `/api/nasabah/{id}` | Detail satu nasabah + histori |
 | `POST` | `/api/nasabah` | Tambah nasabah baru |
 | `PUT` | `/api/nasabah/{id}` | Update data nasabah |
-| `PUT` | `/api/nasabah/{id}/status` | Ubah status nasabah (`A`/`R`/`B`/`T`) |
+| `PUT` | `/api/nasabah/{id}/status` | Ubah status (`A`/`R`/`B`/`T`) |
 | `DELETE` | `/api/nasabah/{id}` | Hapus nasabah (saldo harus 0) |
 | `GET` | `/api/rekening/{norek}` | Info rekening + status nasabah |
 | `GET` | `/api/saldo/{norek}` | Cek saldo rekening |
-| `GET` | `/api/mutasi/{norek}` | Mutasi rekening (`?start_date=&end_date=&limit=&jenis=debit\|kredit`) |
+| `GET` | `/api/mutasi/{norek}` | Mutasi rekening (`?start_date=&end_date=&limit=&jenis=`) |
 | `POST` | `/api/setor` | Setor tunai ke rekening |
 | `POST` | `/api/tarik` | Tarik tunai dari rekening |
-| `POST` | `/api/transfer-lpd` | Transfer antar rekening dalam LPD |
+| `POST` | `/api/transfer-lpd` | Transfer antar rekening LPD |
 | `POST` | `/api/transfer-bank` | Transfer ke bank lain (simulasi) |
 | `GET` | `/api/riwayat-transfer/{norek}` | Riwayat transfer (`?jenis=LPD\|BANK&limit=20`) |
-| `GET` | `/api/bank-list` | Daftar bank yang tersedia + biaya transfer |
-| `GET` | `/api/dashboard` | Statistik sistem & transaksi terbaru |
+| `GET` | `/api/bank-list` | Daftar bank + biaya transfer |
+| `GET` | `/api/dashboard` | Statistik & transaksi terbaru |
 
----
+### Contoh Request
 
-### Contoh Request & Response
-
-#### POST `/api/login` — Login
-```bash
-curl -X POST http://localhost:8080/api/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"admin123"}'
-```
+**POST `/api/nasabah`** — Tambah Nasabah
 ```json
 {
-  "status": "00",
-  "message": "Login berhasil",
-  "user": {
-    "id": 1,
-    "nama": "Administrator LPD Canggu",
-    "norek": "00.000000",
-    "username": "admin",
-    "status": "A",
-    "saldo": 0,
-    "saldo_fmt": "Rp 0"
-  }
-}
-```
-
----
-
-#### POST `/api/nasabah` — Tambah Nasabah
-```bash
-curl -X POST http://localhost:8080/api/nasabah \
-  -H "Content-Type: application/json" \
-  -d '{
-    "nama": "I Wayan Sudarsana",
-    "username": "wayan.sudarsana",
-    "pass_crypto": "password123",
-    "pin_crypto": "112233",
-    "phone": "081234567890",
-    "email": "wayan@email.com",
-    "alamat": "Br. Canggu, Kuta Utara, Badung"
-  }'
-```
-```json
-{
-  "status": "00",
-  "message": "Nasabah berhasil didaftarkan",
-  "noid": "CG.000000002",
-  "norek": "01.000002",
   "nama": "I Wayan Sudarsana",
-  "status": "R",
-  "note": "Status Registrasi. Aktifkan nasabah untuk mulai bertransaksi."
+  "username": "wayan.sudarsana",
+  "pass_crypto": "password123",
+  "pin_crypto": "112233",
+  "phone": "081234567890",
+  "email": "wayan@email.com",
+  "alamat": "Br. Canggu, Kuta Utara, Badung"
 }
 ```
 
----
-
-#### PUT `/api/nasabah/{id}/status` — Ubah Status
-```bash
-curl -X PUT http://localhost:8080/api/nasabah/2/status \
-  -H "Content-Type: application/json" \
-  -d '{"status":"A"}'
+**POST `/api/setor`** — Setor Tunai
+```json
+{ "norek": "01.000002", "amount": 1000000, "remark": "Setor tunai" }
 ```
 
-**Status yang tersedia:**
-
-| Kode | Keterangan |
-|------|------------|
-| `A` | Aktif — dapat bertransaksi |
-| `R` | Registrasi — menunggu aktivasi |
-| `B` | Blokir — akun dibekukan |
-| `T` | Tutup — akun ditutup permanen |
-
----
-
-#### POST `/api/setor` — Setor Tunai
-```bash
-curl -X POST http://localhost:8080/api/setor \
-  -H "Content-Type: application/json" \
-  -d '{"norek":"01.000002","amount":1000000,"remark":"Setor tunai"}'
+**POST `/api/tarik`** — Tarik Tunai
+```json
+{ "norek": "01.000002", "amount": 200000, "remark": "Tarik tunai" }
 ```
+
+**POST `/api/transfer-lpd`** — Transfer Antar LPD
+```json
+{ "from_norek": "01.000002", "to_norek": "01.000003", "amount": 100000 }
+```
+
+**POST `/api/transfer-bank`** — Transfer ke Bank Lain
 ```json
 {
-  "status": "00",
-  "message": "Setor tunai berhasil",
-  "trans_no": "ST260423xxxx",
-  "norek": "01.000002",
-  "nama": "I Wayan Sudarsana",
-  "jumlah": 1000000,
-  "jumlah_fmt": "Rp 1.000.000",
-  "saldo": 1000000,
-  "saldo_fmt": "Rp 1.000.000"
+  "from_norek": "01.000002",
+  "bank_code": "014",
+  "bank_acc": "1234567890",
+  "to_name": "Budi Santoso",
+  "amount": 500000
 }
 ```
-
----
-
-#### POST `/api/tarik` — Tarik Tunai
-```bash
-curl -X POST http://localhost:8080/api/tarik \
-  -H "Content-Type: application/json" \
-  -d '{"norek":"01.000002","amount":200000,"remark":"Tarik tunai"}'
-```
-
----
-
-#### POST `/api/transfer-lpd` — Transfer Antar LPD
-```bash
-curl -X POST http://localhost:8080/api/transfer-lpd \
-  -H "Content-Type: application/json" \
-  -d '{
-    "from_norek": "01.000002",
-    "to_norek": "01.000003",
-    "amount": 200000,
-    "remark": "Bayar cicilan"
-  }'
-```
-
----
-
-#### POST `/api/transfer-bank` — Transfer ke Bank Lain
-```bash
-curl -X POST http://localhost:8080/api/transfer-bank \
-  -H "Content-Type: application/json" \
-  -d '{
-    "from_norek": "01.000002",
-    "bank_code": "014",
-    "bank_acc": "1234567890",
-    "to_name": "Budi Santoso",
-    "amount": 500000,
-    "remark": "Pembayaran"
-  }'
-```
-
-**Kode bank yang tersedia:**
-
-| Kode | Nama Bank | Biaya Transfer |
-|------|-----------|---------------|
-| `014` | BCA | Rp 5.000 |
-| `008` | Mandiri | Rp 5.000 |
-| `009` | BNI | Rp 5.000 |
-| `002` | BRI | Rp 5.000 |
-| `213` | BPD Bali | Rp 3.500 |
-| `110` | Bank Sinar | Rp 3.500 |
-| `011` | Danamon | Rp 6.500 |
-| `022` | CIMB Niaga | Rp 6.500 |
-| `013` | Permata Bank | Rp 6.500 |
-| `016` | Maybank | Rp 6.500 |
-| `019` | Panin Bank | Rp 6.500 |
-| `028` | OCBC NISP | Rp 6.500 |
-
----
 
 ### Kode Status Response
 
 | Status | HTTP | Keterangan |
 |--------|------|------------|
 | `00` | 200 | Sukses |
-| `01` | 400 | Data tidak lengkap / input tidak valid |
-| `02` | 409 | Data sudah ada / duplikat |
+| `01` | 400 | Input tidak valid / data tidak lengkap |
+| `02` | 409 | Duplikat data |
 | `03` | 401 | Username / password salah |
 | `04` | 404 | Data tidak ditemukan |
 | `05` | 400 | Rekening / nasabah tidak aktif |
-| `06` | 400 | Operasi tidak diizinkan (misal: hapus dengan saldo) |
+| `06` | 400 | Operasi tidak diizinkan |
 | `07` | 403 | Akun diblokir / ditutup |
 | `51` | 400 | Saldo tidak mencukupi |
 | `99` | 500 | Server error |
@@ -963,23 +810,110 @@ curl -X POST http://localhost:8080/api/transfer-bank \
 
 | Parameter | Nilai |
 |-----------|-------|
-| Saldo Minimum Mengendap | Rp 50.000 |
-| Transfer Minimum | Rp 10.000 |
-| Transfer Maksimum | Rp 5.000.000 |
-| Setoran Minimum | Rp 1.000 |
-| Penarikan Minimum | Rp 10.000 |
+| Saldo minimum mengendap | Rp 50.000 |
+| Transfer minimum | Rp 10.000 |
+| Transfer maksimum | Rp 5.000.000 |
+| Setoran minimum | Rp 1.000 |
+| Penarikan minimum | Rp 10.000 |
 
 ---
 
 ## 10. Troubleshooting
 
-### ❌ Error: `pdo_sqlite extension not found`
+### ❌ `404 Not Found` — Semua halaman (mod_rewrite tidak aktif)
+
 ```bash
-# Ubuntu/Debian
-sudo apt-get install php8.4-sqlite3   # ganti 8.4 sesuai versi PHP
+# Cek mod_rewrite sudah aktif
+apache2ctl -M | grep rewrite
+
+# Aktifkan jika belum ada
+sudo a2enmod rewrite
+sudo systemctl restart apache2
+```
+
+Pastikan `AllowOverride All` ada di blok `<Directory>` Virtual Host — bukan `AllowOverride None`.
+
+---
+
+### ❌ `403 Forbidden` saat akses index
+
+```bash
+# Cek permission folder
+ls -la /var/www/html/lpd-canggu/
+
+# Set permission yang benar
+sudo chmod 755 /var/www/html/lpd-canggu
+sudo chmod 644 /var/www/html/lpd-canggu/*.php
+sudo chmod 644 /var/www/html/lpd-canggu/.htaccess
+sudo chown -R www-data:www-data /var/www/html/lpd-canggu
+```
+
+---
+
+### ❌ API berfungsi tapi halaman utama 404 (sub-folder XAMPP)
+
+Edit `.htaccess` root — ubah `RewriteBase`:
+
+```apache
+# Dari:
+RewriteBase /
+
+# Menjadi (sesuai nama folder):
+RewriteBase /lpd-canggu/
+```
+
+---
+
+### ❌ `500 Internal Server Error` saat akses API
+
+```bash
+# Lihat log Apache
+sudo tail -50 /var/log/apache2/error.log
+sudo tail -50 /var/log/apache2/lpd-canggu-error.log
+
+# Atau aktifkan display_errors sementara
+sudo nano /var/www/html/lpd-canggu/.htaccess
+# Tambahkan: php_flag display_errors On
+```
+
+---
+
+### ❌ `Permission denied` pada folder `data/` atau `logs/`
+
+```bash
+sudo chown -R www-data:www-data /var/www/html/lpd-canggu/data
+sudo chown -R www-data:www-data /var/www/html/lpd-canggu/logs
+sudo chmod 755 /var/www/html/lpd-canggu/data /var/www/html/lpd-canggu/logs
+```
+
+---
+
+### ❌ `.htaccess` diabaikan (AllowOverride None)
+
+```bash
+# Cek konfigurasi aktif
+grep -r "AllowOverride" /etc/apache2/
+
+# Edit konfigurasi site
+sudo nano /etc/apache2/sites-available/lpd-canggu.conf
+# Pastikan ada: AllowOverride All
+
+sudo systemctl reload apache2
+```
+
+---
+
+### ❌ `pdo_sqlite extension not found`
+
+```bash
+# Ubuntu/Debian — sesuaikan versi PHP
+sudo apt-get install php8.4-sqlite3
 
 # CentOS/RHEL
 sudo dnf install php-sqlite3
+
+# Restart Apache setelah install
+sudo systemctl restart apache2
 
 # Verifikasi
 php -m | grep -i sqlite
@@ -987,124 +921,17 @@ php -m | grep -i sqlite
 
 ---
 
-### ❌ Error: `php: command not found`
-```bash
-# Ubuntu/Debian — cari PHP yang terinstall
-which php7.4 php8.0 php8.1 php8.4
-
-# Buat symlink
-sudo ln -s /usr/bin/php8.4 /usr/local/bin/php
-
-# Windows — pastikan PATH sudah berisi folder PHP
-# System Properties → Environment Variables → Path → tambahkan C:\php
-```
-
----
-
-### ❌ Error: `Cannot connect to SQL Server (HYT00)`
-
-Kemungkinan penyebab:
-
-1. SQL Server tidak berjalan:
-   ```bash
-   # Windows
-   services.msc → SQL Server (MSSQLSERVER)
-
-   # Linux
-   systemctl status mssql-server
-   ```
-2. Port 1433 diblokir firewall:
-   ```bash
-   sudo ufw allow 1433
-   nc -zv <DB_HOST> 1433   # Test koneksi
-   ```
-3. TCP/IP belum aktif → Buka SQL Server Configuration Manager → Network Configuration → Enable TCP/IP
-4. `DB_HOST` salah → Test: `ping <DB_HOST>`
-
----
-
-### ❌ Error: `Permission denied` pada folder `data/` atau `logs/`
-```bash
-# Jika dijalankan sebagai user biasa
-chmod 755 data/ logs/
-
-# Jika menggunakan Nginx (www-data)
-sudo chown -R www-data:www-data data/ logs/
-sudo chmod 755 data/ logs/
-
-# Jika masih gagal (mode permissive sementara)
-chmod 777 data/ logs/
-```
-
----
-
-### ❌ Error: Port 8080 sudah digunakan
-```bash
-# Cari dan hentikan proses
-fuser -k 8080/tcp
-
-# Atau ganti port
-php -S 0.0.0.0:9090 router.php
-```
-
----
-
-### ❌ Halaman kosong atau `500 Internal Server Error`
-```bash
-# Aktifkan error display sementara
-php -d display_errors=1 -S 0.0.0.0:8080 router.php
-
-# Atau cek log
-cat logs/php_error.log
-tail -f logs/pm2-error.log   # Jika menggunakan PM2
-```
-
----
-
-### ❌ API return `{"status":"404","message":"Endpoint tidak ditemukan"}`
-
-Pastikan HTTP method yang digunakan sesuai:
+### ❌ Cannot connect to SQL Server
 
 ```bash
-# ✅ Benar
-curl -X POST http://localhost:8080/api/setor ...
-curl http://localhost:8080/api/saldo/01.000002
+# Test koneksi port SQL Server
+nc -zv <DB_HOST> 1433
 
-# ❌ Salah
-curl http://localhost:8080/api/setor   # GET untuk endpoint POST
-```
-
----
-
-### ❌ Data hilang setelah restart (SQLite)
-
-Pastikan `SQLITE_PATH` menggunakan path **absolut** di `.env`:
-
-```ini
-# ✅ Benar — path absolut
-SQLITE_PATH=/home/user/lpd-canggu/data/lpd_canggu.sqlite
-
-# ❌ Salah — path relatif bisa berubah tergantung working directory
-SQLITE_PATH=data/lpd_canggu.sqlite
-```
-
----
-
-### ❌ Init DB gagal saat menggunakan SQL Server
-
-```bash
-# Cek ekstensi sqlsrv sudah aktif
-php -m | grep -i sqlsrv
-
-# Test koneksi manual
+# Test PDO sqlsrv manual
 php -r "
-\$dsn = 'sqlsrv:Server=HOST,1433;Database=DB;TrustServerCertificate=1';
-try {
-    \$pdo = new PDO(\$dsn, 'USER', 'PASS');
-    echo 'Koneksi berhasil!';
-} catch(PDOException \$e) {
-    echo 'Gagal: ' . \$e->getMessage();
-}
+\$dsn = 'sqlsrv:Server=<DB_HOST>,1433;Database=<DB_DATABASE>;TrustServerCertificate=1';
+try { new PDO(\$dsn, '<user>', '<pass>'); echo 'OK'; }
+catch(PDOException \$e) { echo 'GAGAL: '.\$e->getMessage(); }
 "
 ```
 
@@ -1112,39 +939,36 @@ try {
 
 ## 11. Keamanan Produksi
 
-1. **Ganti password admin default** segera setelah instalasi:
-   - Login sebagai admin → ubah password melalui fitur ganti password
-   - Atau langsung update di database:
+1. **Ganti password admin default** setelah instalasi:
+   - Login → ubah password via UI, atau update langsung di DB:
      ```bash
      sqlite3 data/lpd_canggu.sqlite \
        "UPDATE gmob_nasabah SET pass_crypto='HASH_BARU' WHERE username='admin'"
      ```
 
-2. **Jangan expose `.env`** ke publik:
-   - Pastikan Nginx/Apache memblokir akses ke `.env`
-   - Sudah dikonfigurasi di contoh Nginx di atas
-
-3. **Gunakan HTTPS** di production:
+2. **Aktifkan HTTPS** dengan Let's Encrypt:
    ```bash
-   sudo certbot --nginx -d domain.anda.id
+   sudo apt-get install -y certbot python3-certbot-apache
+   sudo certbot --apache -d lpd.contoh.id
    ```
 
-4. **Backup database SQLite** secara rutin:
+3. **`.htaccess` sudah melindungi** folder sensitif (`data/`, `logs/`, `config/`, `includes/`, `api/`) — pastikan Apache membaca `.htaccess` (`AllowOverride All`)
+
+4. **Nonaktifkan `/api/init-db`** setelah database selesai diinisialisasi:
+   - Buka `router.php` → hapus atau komentari baris route `api/init-db`, atau
+   - Tambahkan di `api/init.php` whitelist IP:
+     ```php
+     if ($_SERVER['REMOTE_ADDR'] !== '127.0.0.1') json_err('Forbidden', '99', 403);
+     ```
+
+5. **Backup database SQLite** secara rutin:
    ```bash
-   # Tambahkan ke crontab (cron job setiap malam jam 02:00)
-   0 2 * * * cp /path/lpd-canggu/data/lpd_canggu.sqlite \
+   # Crontab — backup tiap malam jam 02:00
+   0 2 * * * cp /var/www/html/lpd-canggu/data/lpd_canggu.sqlite \
      /backup/lpd_$(date +\%Y\%m\%d).sqlite
    ```
 
-5. **Batasi akses** endpoint `/api/init-db` setelah instalasi selesai (hindari reset tidak sengaja):
-   - Nonaktifkan route di `router.php` atau batasi dengan IP whitelist di Nginx
-
-6. **Set `display_errors = Off`** di production `php.ini`:
-   ```ini
-   display_errors = Off
-   log_errors = On
-   error_log = /path/ke/logs/php_error.log
-   ```
+6. **Set `display_errors = Off`** di `.htaccess` production (sudah dikonfigurasi di `.htaccess` root)
 
 ---
 
@@ -1155,6 +979,7 @@ try {
 | **Repository** | https://github.com/pt-zenity/BPDBALI-TRF |
 | **Branch** | `main` |
 | **Bahasa** | PHP 7.0 — PHP 8.4 (tanpa framework) |
+| **Web Server** | Apache 2.2/2.4 (direkomendasikan) · Nginx · PHP built-in |
 | **Database** | SQLite (dev) / SQL Server MSSQL (produksi) |
 | **Frontend** | HTML + Tailwind CSS CDN + Vanilla JS |
 | **Dependensi** | Tidak ada (no Composer, no npm) |

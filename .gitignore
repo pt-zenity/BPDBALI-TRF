@@ -10,9 +10,18 @@ logs/*.log
 .DS_Store
 Thumbs.db
 
-# PM2 ecosystem (opsional, boleh di-ignore jika tidak mau commit)
-# ecosystem.config.cjs
-
 # PHP error log
 *.log
 php_error.log
+
+# Environment lokal (berisi kredensial)
+.env
+
+# Pastikan .htaccess di semua folder tetap di-commit
+!.htaccess
+!api/.htaccess
+!config/.htaccess
+!includes/.htaccess
+!data/.htaccess
+!logs/.htaccess
+!public/.htaccess

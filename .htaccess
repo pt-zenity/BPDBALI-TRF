@@ -1,0 +1,107 @@
+# ============================================================
+#  LPD Canggu — Apache .htaccess (Root)
+#  Kompatibel: Apache 2.2 & 2.4  |  PHP 7.0 – 8.4
+#  Aktifkan mod_rewrite: a2enmod rewrite && systemctl reload apache2
+# ============================================================
+
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+# ----------------------------------------------------------
+# 1. AKTIFKAN REWRITE ENGINE
+# ----------------------------------------------------------
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Sesuaikan jika aplikasi berada di sub-folder.
+    # Contoh: jika diakses via http://domain.com/lpd-canggu/
+    # maka ubah menjadi: RewriteBase /lpd-canggu/
+    # Jika diakses dari root domain, biarkan:
+    RewriteBase /
+
+    # ----------------------------------------------------------
+    # 2. ARAHKAN KE ROUTER.PHP (kecuali file/folder yang ada)
+    # ----------------------------------------------------------
+
+    # Lewati file dan folder yang benar-benar ada
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Semua request lain → router.php
+    RewriteRule ^ router.php [L,QSA]
+</IfModule>
+
+# ----------------------------------------------------------
+# 3. PROTEKSI FILE SENSITIF
+# ----------------------------------------------------------
+<FilesMatch "^(\.env|\.gitignore|ecosystem\.config\.cjs|composer\.json|composer\.lock|package\.json)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# ----------------------------------------------------------
+# 4. HEADERS KEAMANAN
+# ----------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# ----------------------------------------------------------
+# 5. CORS (diizinkan dari semua origin — sesuaikan jika perlu)
+# ----------------------------------------------------------
+<IfModule mod_headers.c>
+    Header always set Access-Control-Allow-Origin "*"
+    Header always set Access-Control-Allow-Methods "GET, POST, PUT, DELETE, OPTIONS"
+    Header always set Access-Control-Allow-Headers "Content-Type, Authorization, X-Requested-With"
+</IfModule>
+
+# ----------------------------------------------------------
+# 6. CACHE STATIC ASSETS
+# ----------------------------------------------------------
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType text/css             "access plus 7 days"
+    ExpiresByType application/javascript "access plus 7 days"
+    ExpiresByType image/png            "access plus 30 days"
+    ExpiresByType image/jpeg           "access plus 30 days"
+    ExpiresByType image/svg+xml        "access plus 30 days"
+    ExpiresByType image/x-icon         "access plus 30 days"
+    ExpiresByType font/woff2           "access plus 30 days"
+    ExpiresByType font/woff            "access plus 30 days"
+</IfModule>
+
+# ----------------------------------------------------------
+# 7. KOMPRESI GZIP
+# ----------------------------------------------------------
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/css application/javascript
+    AddOutputFilterByType DEFLATE application/json text/plain
+</IfModule>
+
+# ----------------------------------------------------------
+# 8. PHP SETTINGS (override php.ini lokal)
+# ----------------------------------------------------------
+<IfModule mod_php.c>
+    php_flag  display_errors      Off
+    php_flag  log_errors          On
+    php_value error_log           logs/php_error.log
+    php_value max_execution_time  30
+    php_value memory_limit        128M
+    php_value post_max_size       10M
+    php_value upload_max_filesize 10M
+</IfModule>
+
+# Untuk PHP-FPM (php_value tidak berlaku, gunakan .user.ini)
+# Buat file .user.ini di root dengan isi:
+# display_errors = Off
+# log_errors = On
+# error_log = logs/php_error.log

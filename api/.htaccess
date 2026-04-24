@@ -1,0 +1,22 @@
+# Folder api/ — Larang akses langsung via browser
+# File PHP di sini hanya boleh diakses melalui router.php (require/include)
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Tolak semua akses langsung ke file PHP di folder ini
+    RewriteCond %{ENV:REDIRECT_STATUS} ^$
+    RewriteRule \.php$ - [F,L]
+</IfModule>
+
+# Fallback untuk Apache 2.4 tanpa mod_rewrite
+<FilesMatch "\.php$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
