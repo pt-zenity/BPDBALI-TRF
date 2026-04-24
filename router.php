@@ -28,30 +28,39 @@ if (preg_match('/\.(css|js|png|jpg|jpeg|ico|svg|woff2?|ttf|eot)$/i', $uri)) {
 
 // Route tabel API [METHOD_REGEX, URI_REGEX, handler]
 $routes = array(
-    array('POST',            '#^/api/init-db$#',                    'api/init.php'),
-    array('GET|POST',        '#^/api/nasabah$#',                    'api/nasabah.php'),
-    array('GET|PUT|DELETE',  '#^/api/nasabah/[0-9]+$#',            'api/nasabah.php'),
-    array('PUT',             '#^/api/nasabah/[0-9]+/status$#',     'api/nasabah.php'),
-    array('GET',             '#^/api/rekening/[^/]+$#',             'api/rekening.php'),
-    array('GET',             '#^/api/saldo/[^/]+$#',                'api/saldo.php'),
-    array('GET',             '#^/api/mutasi/[^/]+$#',               'api/mutasi.php'),
-    array('POST',            '#^/api/setor$#',                      'api/setor.php'),
-    array('POST',            '#^/api/tarik$#',                      'api/tarik.php'),
-    array('POST',            '#^/api/transfer-lpd$#',               'api/transfer_lpd.php'),
-    array('POST',            '#^/api/transfer-bank$#',              'api/transfer_bank.php'),
-    array('GET',             '#^/api/bank-list$#',                  'api/bank_list.php'),
-    array('GET',             '#^/api/dashboard$#',                  'api/dashboard.php'),
-    array('POST',            '#^/api/login$#',                      'api/login.php'),
-    array('GET',             '#^/api/riwayat-transfer/[^/]+$#',    'api/riwayat_transfer.php'),
+    array('POST',            '#^/api/init-db$#',                   'api/init.php'),
+    array('GET|POST',        '#^/api/nasabah$#',                   'api/nasabah.php'),
+    array('GET|PUT|DELETE',  '#^/api/nasabah/[0-9]+$#',           'api/nasabah.php'),
+    array('PUT',             '#^/api/nasabah/[0-9]+/status$#',    'api/nasabah.php'),
+    array('GET',             '#^/api/rekening/[^/]+$#',            'api/rekening.php'),
+    array('GET',             '#^/api/saldo/[^/]+$#',               'api/saldo.php'),
+    array('GET',             '#^/api/mutasi/[^/]+$#',              'api/mutasi.php'),
+    array('POST',            '#^/api/setor$#',                     'api/setor.php'),
+    array('POST',            '#^/api/tarik$#',                     'api/tarik.php'),
+    array('POST',            '#^/api/transfer-lpd$#',              'api/transfer_lpd.php'),
+    array('POST',            '#^/api/transfer-bank$#',             'api/transfer_bank.php'),
+    array('GET',             '#^/api/bank-list$#',                 'api/bank_list.php'),
+    array('GET',             '#^/api/dashboard$#',                 'api/dashboard.php'),
+    array('POST',            '#^/api/login$#',                     'api/login.php'),
+    array('GET',             '#^/api/riwayat-transfer/[^/]+$#',   'api/riwayat_transfer.php'),
 );
+
+// Cek apakah URI dikenal (untuk deteksi 405 vs 404)
+$uriMatched  = false;
+$routeMatched = false;
 
 foreach ($routes as $route) {
     $methods = $route[0];
     $pattern = $route[1];
     $handler = $route[2];
-    if (preg_match('#^(' . $methods . ')$#', $method) && preg_match($pattern, $uri)) {
-        require __DIR__ . '/' . $handler;
-        return true;
+
+    if (preg_match($pattern, $uri)) {
+        $uriMatched = true;                                   // URI dikenal
+        if (preg_match('#^(' . $methods . ')$#', $method)) {
+            $routeMatched = true;
+            require __DIR__ . '/' . $handler;
+            return true;
+        }
     }
 }
 
@@ -61,7 +70,22 @@ if (strpos($uri, '/api/') !== 0) {
     return true;
 }
 
-// 404 untuk API tidak dikenal
+// URI dikenal tapi method salah -> 405 Method Not Allowed
+if ($uriMatched) {
+    http_response_code(405);
+    header('Content-Type: application/json');
+    header('Allow: GET, POST, PUT, DELETE, OPTIONS');
+    echo json_encode(array(
+        'status'  => '405',
+        'message' => 'Method ' . $method . ' tidak diizinkan untuk endpoint: ' . $uri,
+    ));
+    exit;
+}
+
+// URI tidak dikenal -> 404 Not Found
 http_response_code(404);
 header('Content-Type: application/json');
-echo json_encode(array('status' => '404', 'message' => 'Endpoint tidak ditemukan: ' . $uri));
+echo json_encode(array(
+    'status'  => '404',
+    'message' => 'Endpoint tidak ditemukan: ' . $uri,
+));

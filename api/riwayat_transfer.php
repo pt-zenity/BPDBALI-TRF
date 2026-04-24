@@ -38,5 +38,6 @@ try {
 
     json_ok(array('data' => $rows, 'total' => count($rows)));
 } catch (Exception $e) {
-    json_err($e->getMessage(), '99', 500);
+    error_log('[riwayat_transfer] ' . $e->getMessage());
+    json_err('Server error: ' . $e->getMessage(), '99', 500);
 }

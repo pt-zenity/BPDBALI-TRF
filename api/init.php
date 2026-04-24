@@ -19,5 +19,6 @@ try {
         'detail'  => $msgs,
     ));
 } catch (Exception $e) {
+    error_log('[init] ' . $e->getMessage());
     json_err('Gagal init DB: ' . $e->getMessage(), '99', 500);
 }

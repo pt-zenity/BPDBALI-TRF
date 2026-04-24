@@ -36,5 +36,6 @@ try {
         )
     ));
 } catch (Exception $e) {
+    error_log('[rekening] ' . $e->getMessage());
     json_err('Server error: ' . $e->getMessage(), '99', 500);
 }

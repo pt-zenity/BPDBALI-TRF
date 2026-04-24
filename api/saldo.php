@@ -22,13 +22,14 @@ try {
     if (!$rek) json_err('Rekening tidak ditemukan', '04', 404);
 
     json_ok(array(
-        'norek'     => $rek['notab'],
-        'nama'      => $rek['nama'],
-        'produk'    => $rek['produk'],
-        'saldo'     => (float)$rek['saldo'],
-        'saldo_fmt' => rp((float)$rek['saldo']),
-        'status'    => $rek['status'],
+        'norek'      => $rek['notab'],
+        'nama'       => $rek['nama'],
+        'produk'     => $rek['produk'],
+        'saldo'      => (float)$rek['saldo'],
+        'saldo_fmt'  => rp((float)$rek['saldo']),
+        'status_rek' => $rek['status'],
     ));
 } catch (Exception $e) {
-    json_err($e->getMessage(), '99', 500);
+    error_log('[saldo] ' . $e->getMessage());
+    json_err('Server error: ' . $e->getMessage(), '99', 500);
 }
