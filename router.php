@@ -1,6 +1,7 @@
 <?php
 /**
  * LPD Canggu - PHP Router
+ * Kompatibel: PHP 7.0 - PHP 8.x
  * Jalankan: php -S 0.0.0.0:8080 router.php
  */
 
@@ -20,40 +21,42 @@ if ($method === 'OPTIONS') {
 // Static files dari folder public/
 if (preg_match('/\.(css|js|png|jpg|jpeg|ico|svg|woff2?|ttf|eot)$/i', $uri)) {
     $file = __DIR__ . '/public' . $uri;
-    if (file_exists($file)) return false; // biarkan built-in server handle
+    if (file_exists($file)) return false;
     http_response_code(404);
     exit;
 }
 
-// Route tabel API
-$routes = [
-    // [METHOD_REGEX, URI_REGEX, handler]
-    ['POST',        '#^/api/init-db$#',                    'api/init.php'],
-    ['GET|POST',    '#^/api/nasabah$#',                    'api/nasabah.php'],
-    ['GET|PUT|DELETE', '#^/api/nasabah/\d+$#',            'api/nasabah.php'],
-    ['PUT',         '#^/api/nasabah/\d+/status$#',         'api/nasabah.php'],
-    ['GET',         '#^/api/rekening/[^/]+$#',             'api/rekening.php'],
-    ['GET',         '#^/api/saldo/[^/]+$#',                'api/saldo.php'],
-    ['GET',         '#^/api/mutasi/[^/]+$#',               'api/mutasi.php'],
-    ['POST',        '#^/api/setor$#',                      'api/setor.php'],
-    ['POST',        '#^/api/tarik$#',                      'api/tarik.php'],
-    ['POST',        '#^/api/transfer-lpd$#',               'api/transfer_lpd.php'],
-    ['POST',        '#^/api/transfer-bank$#',              'api/transfer_bank.php'],
-    ['GET',         '#^/api/bank-list$#',                  'api/bank_list.php'],
-    ['GET',         '#^/api/dashboard$#',                  'api/dashboard.php'],
-    ['POST',        '#^/api/login$#',                      'api/login.php'],
-    ['GET',         '#^/api/riwayat-transfer/[^/]+$#',     'api/riwayat_transfer.php'],
-];
+// Route tabel API [METHOD_REGEX, URI_REGEX, handler]
+$routes = array(
+    array('POST',            '#^/api/init-db$#',                    'api/init.php'),
+    array('GET|POST',        '#^/api/nasabah$#',                    'api/nasabah.php'),
+    array('GET|PUT|DELETE',  '#^/api/nasabah/[0-9]+$#',            'api/nasabah.php'),
+    array('PUT',             '#^/api/nasabah/[0-9]+/status$#',     'api/nasabah.php'),
+    array('GET',             '#^/api/rekening/[^/]+$#',             'api/rekening.php'),
+    array('GET',             '#^/api/saldo/[^/]+$#',                'api/saldo.php'),
+    array('GET',             '#^/api/mutasi/[^/]+$#',               'api/mutasi.php'),
+    array('POST',            '#^/api/setor$#',                      'api/setor.php'),
+    array('POST',            '#^/api/tarik$#',                      'api/tarik.php'),
+    array('POST',            '#^/api/transfer-lpd$#',               'api/transfer_lpd.php'),
+    array('POST',            '#^/api/transfer-bank$#',              'api/transfer_bank.php'),
+    array('GET',             '#^/api/bank-list$#',                  'api/bank_list.php'),
+    array('GET',             '#^/api/dashboard$#',                  'api/dashboard.php'),
+    array('POST',            '#^/api/login$#',                      'api/login.php'),
+    array('GET',             '#^/api/riwayat-transfer/[^/]+$#',    'api/riwayat_transfer.php'),
+);
 
-foreach ($routes as [$methods, $pattern, $handler]) {
-    if (preg_match("#^($methods)$#", $method) && preg_match($pattern, $uri)) {
+foreach ($routes as $route) {
+    $methods = $route[0];
+    $pattern = $route[1];
+    $handler = $route[2];
+    if (preg_match('#^(' . $methods . ')$#', $method) && preg_match($pattern, $uri)) {
         require __DIR__ . '/' . $handler;
         return true;
     }
 }
 
-// Semua request non-API → halaman utama
-if (!str_starts_with($uri, '/api/')) {
+// Semua request non-API -> halaman utama
+if (strpos($uri, '/api/') !== 0) {
     require __DIR__ . '/index.php';
     return true;
 }
@@ -61,4 +64,4 @@ if (!str_starts_with($uri, '/api/')) {
 // 404 untuk API tidak dikenal
 http_response_code(404);
 header('Content-Type: application/json');
-echo json_encode(['status' => '404', 'message' => 'Endpoint tidak ditemukan: ' . $uri]);
+echo json_encode(array('status' => '404', 'message' => 'Endpoint tidak ditemukan: ' . $uri));

@@ -1,62 +1,93 @@
 <?php
 /**
  * LPD Canggu - Konfigurasi Database
- * Support: SQLite (default lokal) dan SQL Server (sqlsrv - produksi)
+ * Kompatibel: PHP 7.0 - PHP 8.x
+ * Support: SQLite (default/lokal) dan SQL Server (sqlsrv - produksi)
  */
 
-// Ambil dari environment atau gunakan .env jika ada
+// Polyfill PHP 8.0 string functions untuk PHP 7.x
+if (!function_exists('str_starts_with')) {
+    function str_starts_with($haystack, $needle) {
+        return strlen($needle) === 0 || strpos($haystack, $needle) === 0;
+    }
+}
+if (!function_exists('str_ends_with')) {
+    function str_ends_with($haystack, $needle) {
+        return strlen($needle) === 0 || substr($haystack, -strlen($needle)) === $needle;
+    }
+}
+if (!function_exists('str_contains')) {
+    function str_contains($haystack, $needle) {
+        return strlen($needle) === 0 || strpos($haystack, $needle) !== false;
+    }
+}
+
+// Ambil konfigurasi dari .env jika ada
 $envFile = __DIR__ . '/../.env';
 if (file_exists($envFile)) {
     $lines = file($envFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
     foreach ($lines as $line) {
-        if (str_starts_with(trim($line), '#')) continue;
-        if (str_contains($line, '=')) {
-            [$key, $val] = explode('=', $line, 2);
+        $line = trim($line);
+        if ($line === '' || $line[0] === '#') continue;
+        if (strpos($line, '=') !== false) {
+            list($key, $val) = explode('=', $line, 2);
             $_ENV[trim($key)] = trim($val, " \t\n\r\"'");
         }
     }
 }
 
-define('DB_CONNECTION', $_ENV['DB_CONNECTION'] ?? getenv('DB_CONNECTION') ?: 'sqlite');
-define('DB_HOST',       $_ENV['DB_HOST']       ?? getenv('DB_HOST')       ?: 'localhost');
-define('DB_PORT',       $_ENV['DB_PORT']       ?? getenv('DB_PORT')       ?: '1433');
-define('DB_DATABASE',   $_ENV['DB_DATABASE']   ?? getenv('DB_DATABASE')   ?: 'Giosoft_LPD');
-define('DB_USERNAME',   $_ENV['DB_USERNAME']   ?? getenv('DB_USERNAME')   ?: 'sa');
-define('DB_PASSWORD',   $_ENV['DB_PASSWORD']   ?? getenv('DB_PASSWORD')   ?: '#sa.lpd.Canggu.21');
-define('SQLITE_PATH',   $_ENV['SQLITE_PATH']   ?? getenv('SQLITE_PATH')   ?: __DIR__ . '/../data/lpd_canggu.sqlite');
+define('DB_CONNECTION', isset($_ENV['DB_CONNECTION']) ? $_ENV['DB_CONNECTION'] : (getenv('DB_CONNECTION') ?: 'sqlite'));
+define('DB_HOST',       isset($_ENV['DB_HOST'])       ? $_ENV['DB_HOST']       : (getenv('DB_HOST')       ?: 'localhost'));
+define('DB_PORT',       isset($_ENV['DB_PORT'])       ? $_ENV['DB_PORT']       : (getenv('DB_PORT')       ?: '1433'));
+define('DB_DATABASE',   isset($_ENV['DB_DATABASE'])   ? $_ENV['DB_DATABASE']   : (getenv('DB_DATABASE')   ?: 'Giosoft_LPD'));
+define('DB_USERNAME',   isset($_ENV['DB_USERNAME'])   ? $_ENV['DB_USERNAME']   : (getenv('DB_USERNAME')   ?: 'sa'));
+define('DB_PASSWORD',   isset($_ENV['DB_PASSWORD'])   ? $_ENV['DB_PASSWORD']   : (getenv('DB_PASSWORD')   ?: '#sa.lpd.Canggu.21'));
+define('SQLITE_PATH',   isset($_ENV['SQLITE_PATH'])   ? $_ENV['SQLITE_PATH']   : (getenv('SQLITE_PATH')   ?: __DIR__ . '/../data/lpd_canggu.sqlite'));
 
-define('SALDO_MIN',     50000);
-define('MIN_TRANSFER',  10000);
-define('MAX_TRANSFER',  5000000);
+define('SALDO_MIN',    50000);
+define('MIN_TRANSFER', 10000);
+define('MAX_TRANSFER', 5000000);
 define('BIAYA_ADMIN_BANK', 5000);
 
 // =====================================================
-class DB {
-    private static ?PDO $conn    = null;
-    private static string $driver = '';
+class DB
+{
+    /** @var PDO|null */
+    private static $conn = null;
 
-    public static function connect(): PDO {
-        if (self::$conn !== null) return self::$conn;
+    /** @var string */
+    private static $driver = '';
+
+    /**
+     * @return PDO
+     */
+    public static function connect()
+    {
+        if (self::$conn !== null) {
+            return self::$conn;
+        }
 
         if (DB_CONNECTION === 'sqlsrv') {
             // --- SQL Server ---
-            $dsn = "sqlsrv:Server=" . DB_HOST . "," . DB_PORT
-                 . ";Database=" . DB_DATABASE
-                 . ";TrustServerCertificate=1;LoginTimeout=5";
-            self::$conn = new PDO($dsn, DB_USERNAME, DB_PASSWORD, [
+            $dsn = 'sqlsrv:Server=' . DB_HOST . ',' . DB_PORT
+                 . ';Database=' . DB_DATABASE
+                 . ';TrustServerCertificate=1;LoginTimeout=5';
+            self::$conn = new PDO($dsn, DB_USERNAME, DB_PASSWORD, array(
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_TIMEOUT            => 5,
-            ]);
+            ));
             self::$driver = 'sqlsrv';
         } else {
             // --- SQLite ---
             $dir = dirname(SQLITE_PATH);
-            if (!is_dir($dir)) mkdir($dir, 0755, true);
-            self::$conn = new PDO('sqlite:' . SQLITE_PATH, null, null, [
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            self::$conn = new PDO('sqlite:' . SQLITE_PATH, null, null, array(
                 PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-            ]);
+            ));
             self::$conn->exec('PRAGMA journal_mode=WAL');
             self::$conn->exec('PRAGMA foreign_keys=ON');
             self::$driver = 'sqlite';
@@ -65,49 +96,116 @@ class DB {
         return self::$conn;
     }
 
-    public static function driver(): string { return self::$driver; }
-    public static function isSqlSrv(): bool { return self::$driver === 'sqlsrv'; }
-
-    public static function pdo(): PDO { return self::connect(); }
-
-    public static function all(string $sql, array $p = []): array {
-        $s = self::connect()->prepare($sql);
-        $s->execute($p);
-        return $s->fetchAll() ?: [];
+    /**
+     * @return string
+     */
+    public static function driver()
+    {
+        return self::$driver;
     }
 
-    public static function first(string $sql, array $p = []): ?array {
+    /**
+     * @return bool
+     */
+    public static function isSqlSrv()
+    {
+        return self::$driver === 'sqlsrv';
+    }
+
+    /**
+     * @return PDO
+     */
+    public static function pdo()
+    {
+        return self::connect();
+    }
+
+    /**
+     * Ambil semua baris hasil query
+     * @param  string $sql
+     * @param  array  $p
+     * @return array
+     */
+    public static function all($sql, $p = array())
+    {
+        $s = self::connect()->prepare($sql);
+        $s->execute($p);
+        $rows = $s->fetchAll();
+        return $rows ? $rows : array();
+    }
+
+    /**
+     * Ambil satu baris hasil query
+     * @param  string $sql
+     * @param  array  $p
+     * @return array|null
+     */
+    public static function first($sql, $p = array())
+    {
         $s = self::connect()->prepare($sql);
         $s->execute($p);
         $r = $s->fetch();
-        return $r ?: null;
+        return $r ? $r : null;
     }
 
-    public static function run(string $sql, array $p = []): bool {
+    /**
+     * Jalankan INSERT / UPDATE / DELETE
+     * @param  string $sql
+     * @param  array  $p
+     * @return bool
+     */
+    public static function run($sql, $p = array())
+    {
         return self::connect()->prepare($sql)->execute($p);
     }
 
-    public static function lastId(): string {
+    /**
+     * @return string
+     */
+    public static function lastId()
+    {
         return self::connect()->lastInsertId();
     }
 
-    public static function scalar(string $sql, array $p = []): mixed {
+    /**
+     * Ambil nilai scalar (kolom pertama, baris pertama)
+     * @param  string $sql
+     * @param  array  $p
+     * @return mixed
+     */
+    public static function scalar($sql, $p = array())
+    {
         $s = self::connect()->prepare($sql);
         $s->execute($p);
         $r = $s->fetch(PDO::FETCH_NUM);
         return $r ? $r[0] : null;
     }
 
-    public static function begin(): void  { self::connect()->beginTransaction(); }
-    public static function commit(): void { self::connect()->commit(); }
-    public static function rollback(): void {
-        if (self::connect()->inTransaction()) self::connect()->rollBack();
+    public static function begin()
+    {
+        self::connect()->beginTransaction();
     }
 
-    // ---- INIT SCHEMA (SQLite) ----
-    public static function initSchema(): array {
-        $pdo = self::connect();
-        $msgs = [];
+    public static function commit()
+    {
+        self::connect()->commit();
+    }
+
+    public static function rollback()
+    {
+        if (self::connect()->inTransaction()) {
+            self::connect()->rollBack();
+        }
+    }
+
+    /**
+     * Buat schema tabel (SQLite)
+     * @return array
+     */
+    public static function initSchema()
+    {
+        $pdo  = self::connect();
+        $msgs = array();
 
         // gmob_nasabah - data mobile banking nasabah
         $pdo->exec("CREATE TABLE IF NOT EXISTS gmob_nasabah (
@@ -128,7 +226,8 @@ class DB {
             aes_cs      TEXT DEFAULT '',
             created_at  TEXT DEFAULT CURRENT_TIMESTAMP,
             updated_at  TEXT DEFAULT CURRENT_TIMESTAMP
-        )"); $msgs[] = 'gmob_nasabah OK';
+        )");
+        $msgs[] = 'gmob_nasabah OK';
 
         // gmob_rekening - daftar rekening per nasabah
         $pdo->exec("CREATE TABLE IF NOT EXISTS gmob_rekening (
@@ -140,7 +239,8 @@ class DB {
             saldo       REAL DEFAULT 0,
             status      TEXT DEFAULT 'A',
             created_at  TEXT DEFAULT CURRENT_TIMESTAMP
-        )"); $msgs[] = 'gmob_rekening OK';
+        )");
+        $msgs[] = 'gmob_rekening OK';
 
         // gtb_nasabah - master data nasabah dari core banking
         $pdo->exec("CREATE TABLE IF NOT EXISTS gtb_nasabah (
@@ -148,7 +248,8 @@ class DB {
             linker  TEXT UNIQUE NOT NULL,
             nasabah TEXT NOT NULL,
             status  TEXT DEFAULT 'A'
-        )"); $msgs[] = 'gtb_nasabah OK';
+        )");
+        $msgs[] = 'gtb_nasabah OK';
 
         // gtb_folio - buku besar transaksi
         $pdo->exec("CREATE TABLE IF NOT EXISTS gtb_folio (
@@ -166,7 +267,8 @@ class DB {
             saldo       REAL DEFAULT 0,
             debit_val   TEXT DEFAULT 'F',
             created_at  TEXT DEFAULT CURRENT_TIMESTAMP
-        )"); $msgs[] = 'gtb_folio OK';
+        )");
+        $msgs[] = 'gtb_folio OK';
 
         // gmob_transfer - log transfer
         $pdo->exec("CREATE TABLE IF NOT EXISTS gmob_transfer (
@@ -187,7 +289,8 @@ class DB {
             ref_no     TEXT DEFAULT '',
             status     TEXT DEFAULT '00',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )"); $msgs[] = 'gmob_transfer OK';
+        )");
+        $msgs[] = 'gmob_transfer OK';
 
         // gcore_bankcode - master bank
         $pdo->exec("CREATE TABLE IF NOT EXISTS gcore_bankcode (
@@ -196,7 +299,8 @@ class DB {
             bank_name     TEXT NOT NULL,
             transfer_cost REAL DEFAULT 5000,
             revenue       REAL DEFAULT 1500
-        )"); $msgs[] = 'gcore_bankcode OK';
+        )");
+        $msgs[] = 'gcore_bankcode OK';
 
         // gmob_token - token sesi mobile
         $pdo->exec("CREATE TABLE IF NOT EXISTS gmob_token (
@@ -206,7 +310,8 @@ class DB {
             start_time TEXT NOT NULL,
             end_time   TEXT DEFAULT '',
             status     TEXT DEFAULT 'open'
-        )"); $msgs[] = 'gmob_token OK';
+        )");
+        $msgs[] = 'gmob_token OK';
 
         // gmob_log_trans - log semua transaksi
         $pdo->exec("CREATE TABLE IF NOT EXISTS gmob_log_trans (
@@ -218,7 +323,8 @@ class DB {
             status     TEXT DEFAULT '00',
             ip_addr    TEXT DEFAULT '',
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
-        )"); $msgs[] = 'gmob_log_trans OK';
+        )");
+        $msgs[] = 'gmob_log_trans OK';
 
         // ---- SEED DATA ----
         $pdo->exec("INSERT OR IGNORE INTO gcore_bankcode (bank_code, bank_name, transfer_cost, revenue) VALUES

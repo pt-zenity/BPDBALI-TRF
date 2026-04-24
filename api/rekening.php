@@ -1,12 +1,13 @@
 <?php
 /**
  * GET /api/rekening/{norek}  - Info rekening + saldo
+ * Kompatibel: PHP 7.0 - PHP 8.x
  */
 require_once __DIR__ . '/../includes/bootstrap.php';
 
 $uri   = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $parts = array_values(array_filter(explode('/', $uri)));
-$norek = urldecode($parts[2] ?? '');
+$norek = isset($parts[2]) ? urldecode($parts[2]) : '';
 
 if (!$norek) json_err('No rekening wajib', '01');
 
@@ -16,24 +17,24 @@ try {
          FROM gmob_rekening r
          LEFT JOIN gmob_nasabah n ON n.norek = r.notab
          WHERE r.notab = ?",
-        [$norek]
+        array($norek)
     );
 
     if (!$rek) json_err('Rekening tidak ditemukan', '04', 404);
 
-    json_ok([
-        'data' => [
-            'norek'           => $rek['notab'],
-            'nama'            => $rek['nama'],
-            'produk'          => $rek['produk'],
-            'saldo'           => (float)$rek['saldo'],
-            'saldo_fmt'       => rp((float)$rek['saldo']),
-            'status_rek'      => $rek['status'],
-            'status_nasabah'  => $rek['status_nasabah'] ?? '-',
-            'phone'           => $rek['phone'] ?? '',
-            'noid'            => $rek['noid']  ?? '',
-        ]
-    ]);
+    json_ok(array(
+        'data' => array(
+            'norek'          => $rek['notab'],
+            'nama'           => $rek['nama'],
+            'produk'         => $rek['produk'],
+            'saldo'          => (float)$rek['saldo'],
+            'saldo_fmt'      => rp((float)$rek['saldo']),
+            'status_rek'     => $rek['status'],
+            'status_nasabah' => isset($rek['status_nasabah']) ? $rek['status_nasabah'] : '-',
+            'phone'          => isset($rek['phone']) ? $rek['phone'] : '',
+            'noid'           => isset($rek['noid'])  ? $rek['noid']  : '',
+        )
+    ));
 } catch (Exception $e) {
     json_err('Server error: ' . $e->getMessage(), '99', 500);
 }

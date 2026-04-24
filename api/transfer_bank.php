@@ -1,19 +1,20 @@
 <?php
 /**
  * POST /api/transfer-bank  - Transfer ke Bank Lain
+ * Kompatibel: PHP 7.0 - PHP 8.x
  */
 require_once __DIR__ . '/../includes/bootstrap.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') json_err('Method harus POST', '01', 405);
 
-$b        = get_body();
-$fromRek  = trim($b['from_norek'] ?? $b['from_acc'] ?? '');
-$toBankCode = trim($b['bank_code'] ?? '');
-$toBankAcc  = trim($b['bank_acc']  ?? $b['to_acc'] ?? '');
-$toBankName = trim($b['to_name']   ?? '');
-$jumlah   = (float)($b['amount']   ?? $b['jumlah'] ?? 0);
-$ket      = trim($b['remark']      ?? 'Transfer ke bank lain');
-$refNo    = trim($b['ref_no']      ?? trans_no('REF'));
+$b          = get_body();
+$fromRek    = trim(isset($b['from_norek']) ? $b['from_norek'] : (isset($b['from_acc']) ? $b['from_acc'] : ''));
+$toBankCode = trim(isset($b['bank_code'])  ? $b['bank_code']  : '');
+$toBankAcc  = trim(isset($b['bank_acc'])   ? $b['bank_acc']   : (isset($b['to_acc'])   ? $b['to_acc']   : ''));
+$toBankName = trim(isset($b['to_name'])    ? $b['to_name']    : '');
+$jumlah     = (float)(isset($b['amount'])  ? $b['amount']     : (isset($b['jumlah'])   ? $b['jumlah']   : 0));
+$ket        = trim(isset($b['remark'])     ? $b['remark']     : 'Transfer ke bank lain');
+$refNo      = trim(isset($b['ref_no'])     ? $b['ref_no']     : trans_no('REF'));
 
 if (!$fromRek)    json_err('No rekening pengirim wajib', '01');
 if (!$toBankCode) json_err('Kode bank tujuan wajib', '01');
@@ -22,19 +23,17 @@ if ($jumlah < MIN_TRANSFER) json_err('Nominal minimal: ' . rp(MIN_TRANSFER), '01
 if ($jumlah > MAX_TRANSFER) json_err('Nominal maksimal: ' . rp(MAX_TRANSFER), '01');
 
 try {
-    // Cek rekening pengirim
     $rekFrom = DB::first(
         "SELECT r.*, n.status as status_nas FROM gmob_rekening r
          LEFT JOIN gmob_nasabah n ON n.norek = r.notab
          WHERE r.notab = ?",
-        [$fromRek]
+        array($fromRek)
     );
     if (!$rekFrom) json_err('Rekening tidak ditemukan', '04', 404);
-    if ($rekFrom['status'] !== 'A') json_err('Rekening tidak aktif', '05');
-    if ($rekFrom['status_nas'] !== 'A') json_err('Nasabah tidak aktif', '05');
+    if ($rekFrom['status']     !== 'A') json_err('Rekening tidak aktif', '05');
+    if ($rekFrom['status_nas'] !== 'A') json_err('Nasabah tidak aktif',  '05');
 
-    // Cek info bank
-    $bank = DB::first("SELECT * FROM gcore_bankcode WHERE bank_code = ?", [$toBankCode]);
+    $bank = DB::first("SELECT * FROM gcore_bankcode WHERE bank_code = ?", array($toBankCode));
     if (!$bank) json_err('Kode bank tidak ditemukan', '04', 404);
 
     $biayaAdmin = (float)$bank['transfer_cost'];
@@ -54,32 +53,32 @@ try {
     DB::begin();
     $transNo = trans_no('AB');
 
-    // Debit dari rekening (nominal + biaya admin)
-    insert_folio(
-        $fromRek, $totalDebit, 0,
-        "Transfer ke {$bank['bank_name']} {$toBankAcc} " . ($toBankName ? "- $toBankName" : '') . " | $ket",
-        'AB', 'system'
-    );
+    $remarkFolio = 'Transfer ke ' . $bank['bank_name'] . ' ' . $toBankAcc;
+    if ($toBankName) $remarkFolio .= ' - ' . $toBankName;
+    $remarkFolio .= ' | ' . $ket;
+
+    insert_folio($fromRek, $totalDebit, 0, $remarkFolio, 'AB', 'system');
 
     $saldoBaru = get_saldo($fromRek);
 
-    // Log transfer
     DB::run(
         "INSERT INTO gmob_transfer
             (trans_date, jenis, from_norek, from_name, to_norek, to_name, bank_code, bank_name,
              amount, cost, balance, remark, trans_no, ref_no, status)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,'00')",
-        [now_iso(), 'BANK', $fromRek, $rekFrom['nama'],
-         $toBankAcc, $toBankName, $toBankCode, $bank['bank_name'],
-         $jumlah, $biayaAdmin, $saldoBaru,
-         $ket, $transNo, $refNo]
+        array(
+            now_iso(), 'BANK', $fromRek, $rekFrom['nama'],
+            $toBankAcc, $toBankName, $toBankCode, $bank['bank_name'],
+            $jumlah, $biayaAdmin, $saldoBaru,
+            $ket, $transNo, $refNo
+        )
     );
 
     DB::commit();
 
-    log_trans($fromRek, 'TRANSFER-BANK', "Ke {$bank['bank_name']} {$toBankAcc}", $totalDebit);
+    log_trans($fromRek, 'TRANSFER-BANK', 'Ke ' . $bank['bank_name'] . ' ' . $toBankAcc, $totalDebit);
 
-    json_ok([
+    json_ok(array(
         'message'      => 'Transfer ke bank berhasil',
         'trans_no'     => $transNo,
         'from_norek'   => $fromRek,
@@ -98,7 +97,7 @@ try {
         'saldo_fmt'    => rp($saldoBaru),
         'ref_no'       => $refNo,
         'note'         => 'Transfer berhasil (simulasi)',
-    ]);
+    ));
 } catch (Exception $e) {
     DB::rollback();
     error_log('[transfer_bank] ' . $e->getMessage());
