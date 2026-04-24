@@ -1,0 +1,18 @@
+# Database SQLite (jangan push data lokal)
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+
+# Logs
+logs/*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PM2 ecosystem (opsional, boleh di-ignore jika tidak mau commit)
+# ecosystem.config.cjs
+
+# PHP error log
+*.log
+php_error.log
